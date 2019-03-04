@@ -13,8 +13,6 @@ int ncmd=0;//keeps a count of the number of commands executed
 
 /*
 pipe
-grep not working (someone please look into this) i am trying this - apurv
-sed not checked - nirav, can you check this?
 operations like 1>&2 are not appending to the history list
 */
 
@@ -160,7 +158,6 @@ int outputfd(char *output, int isappend)
 		}
 
 		char* outputPath;
-		printf("%s\n", output);
 		outputPath = getPath(output);
 		if(strcmp(outputPath,"\0") == 0){
 			printf("%s\n","Path is Invalid " );
@@ -340,7 +337,7 @@ void execute(char *executable,char *input,char *output,char *error,char *attribu
 			}
 
 			if(numArguments > 0){
-				for(int j=0; j<numArguments; j++){
+				for(int j=0; j<numArguments; j++) {
 					args[i] = arguments[j];
 					++i;
 				}
@@ -355,7 +352,6 @@ void execute(char *executable,char *input,char *output,char *error,char *attribu
 				strcat(args[0], executable);
 
 				check = execvp(args[0],args);
-				printf("%s\n", args[0]);
 				if(check < 0) {
 					printf("%s\n", "Exec command failed.");
 				}
@@ -495,11 +491,6 @@ void determineExec(char command[])
 	i = removeSpacing(command, i, lengthString);
 	i = findAttribute(i+1, command, executable);
 
-	if(strcmp("exit", executable) == 0) {
-		printf("%s","\e[1;1H\e[2J");
-		exit(0);
-	}
-
 	while(i<lengthString)
 	{
 
@@ -589,9 +580,29 @@ void splitByPipe(char *line)
 		determineExec(array[0]);
 	}
 	else {
-		for (int j = 0; j < elements; ++j)
+		int fd[elements][2];
+		for(int j=0; j<elements; ++j) {
+			pipe(fd[elements]);
+		}
+
+		for (int j = elements - 1; j>=0 ; --j)
 		{
-			// determineExec(array[j]);
+			pid_t pid = fork();
+			int status;
+			if(pid == 0) {
+				if(j > 0) {
+					
+				}
+				if(j < elements - 1) {
+
+				}
+			}
+			else if(pid > 0) {
+				while(wait(&status) != pid);
+			}
+			else {
+
+			}
 		}
 	}
 }
@@ -609,8 +620,15 @@ void Input()
 	command[strlen(command)-1]='\0';
 	if(strcmp(command,"\n")==0)
 		return;
-	printf("%s\n", command);
 	cmdhistory[ncmd++] = command;
+	if(strcmp("exit", command) == 0) {
+		printf("%s","\e[1;1H\e[2J");
+		exit(0);
+	}
+	for(int i=0; i<strlen(command); ++i) {
+			if(command[i] == (char)34 || command[i] == (char)39)
+				command[i] = ' ';
+	}
 	splitByPipe(command);
 }
 
