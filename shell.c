@@ -13,12 +13,9 @@ int ncmd=0;//keeps a count of the number of commands executed
 
 /*
 pipe
-grep not working
-uniq not working
-sed not checked
-sort not working
-backspace+Tab
-1>>out.txt not append
+grep not working (someone please look into this) i am trying this - apurv
+sed not checked - nirav, can you check this?
+operations like 1>&2 are not appending to the history list
 */
 
 /*
@@ -40,7 +37,6 @@ int splitByType(char *line, char *array[], char *type)
 
 char* getPath(char* string)
 {
-
 	char *actualPath;
 	char *path[1000];
 	char* currentPath = getcwd(NULL,0);
@@ -253,6 +249,7 @@ void execute(char *executable,char *input,char *output,char *error,char *attribu
 		if(strcmp(executable, "clear") == 0)
 		{
 			printf("\e[1;1H\e[2J");
+			return;
 		}
 
 		if(strcmp(executable, "history") == 0) {
@@ -352,7 +349,16 @@ void execute(char *executable,char *input,char *output,char *error,char *attribu
 			int check = execvp(args[0],args);
 
 			if(check < 0) {
-				printf("%s\n", "Exec command failed.");
+
+				memset(args[0],'\0', 1000*sizeof(char));
+				strcat(args[0], "/usr/bin/");
+				strcat(args[0], executable);
+
+				check = execvp(args[0],args);
+				printf("%s\n", args[0]);
+				if(check < 0) {
+					printf("%s\n", "Exec command failed.");
+				}
 			}
 			exit(1);
 		}
@@ -428,7 +434,15 @@ void determineExec(char command[])
 		if(command[g] == '>' && command[g-1] == '1' && (g-2 < 0 || command[g-2] == ' '))
 		{
 				memset(output,'\0', 1000*sizeof(char));
-				int fstart=removeSpacing(command,g,lengthString);
+				int fstart;
+				if(command[g+1] == '>') {
+					isappend = 1;
+					fstart = removeSpacing(command,g+1,lengthString);
+				}
+				else {
+					fstart = removeSpacing(command,g,lengthString);
+				}
+
 				int fend=findAttribute(fstart+1,command,output);
 				outputind = g;
 				for(int y=g-1; y<fend; ++y)
@@ -439,7 +453,14 @@ void determineExec(char command[])
 		else if(command[g] == '>' && command[g-1] == '2' && (g-2 < 0 || command[g-2] == ' '))
 		{
 				memset(error,'\0', 1000*sizeof(char));
-				int fstart=removeSpacing(command,g,lengthString);
+				int fstart;
+				if(command[g+1] == '>') {
+					isappend = 1;
+					fstart = removeSpacing(command,g+1,lengthString);
+				}
+				else {
+					fstart = removeSpacing(command,g,lengthString);
+				}
 				int fend=findAttribute(fstart+1,command,error);
 				errorind = g;
 				for(int y=g-1; y<fend; ++y)
@@ -588,6 +609,7 @@ void Input()
 	command[strlen(command)-1]='\0';
 	if(strcmp(command,"\n")==0)
 		return;
+	printf("%s\n", command);
 	cmdhistory[ncmd++] = command;
 	splitByPipe(command);
 }
