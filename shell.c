@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -8,13 +9,12 @@
 #include<sys/types.h>
 #include<sys/stat.h>
 #include<fcntl.h>
-char *cmdhistory[1000];//stores the commands used
-int ncmd=0;//keeps a count of the number of commands executed
-
-/*
-pipe
-operations like 1>&2 are not appending to the history list
-*/
+char cmdhistory[1000][1000];//stores the commands used
+ int ncmd=0;//keeps a count of the number of commands executed
+char executable[1000], attribute[1000];
+char output[1000], error[1000], input[1000];
+char arguments[100][1000];
+int isappend = 0, numArguments = 0, inputind = -1, outputind = -1, errorind = -1;
 
 /*
 	Splits the array with Type = {">", "<", " "}.
@@ -226,141 +226,127 @@ int errorfd(char *error)
 	return 1;
 }
 
-void execute(char *executable,char *input,char *output,char *error,char *attribute,
-						int numArguments,char	arguments[100][1000], int isappend,int inputIndex,int outputIndex,int errorIndex)
+int specialCommand()
 {
-
-		pid_t pid;
-		int status;
-
-		if(strcmp(executable,"cd") == 0)
-		{
-				int ch = chdir(arguments[0]);
-				if(ch < 0)
-				{
-					printf("Wrong path specified.Check the Path again\n");
-				}
-				return;
-		}
-
-		if(strcmp(executable, "clear") == 0)
-		{
-			printf("\e[1;1H\e[2J");
-			return;
-		}
-
-		if(strcmp(executable, "history") == 0) {
-			if(ncmd == 0) {
-				printf("%s\n", "No Commands Found");
-			}
-			else {
-				for(int i=0; i<ncmd; ++i) {
-					printf("%d %s\n",i+1,cmdhistory[i]);
-				}
-			}
-			return;
-		}
-
-		pid = fork();
-
-		if(pid < 0)
-		{
-			printf("%s\n", "Cannot fork child process!!");
-		}
-		else if(pid == 0)
-		{
-
-			if(inputIndex < outputIndex && inputIndex < errorIndex){
-				int val = inputfd(input);
-				if(val == 0) return;
-				if(outputIndex<errorIndex){
-					val = outputfd(output, isappend);
-					if(val == 0) return;
-					val = errorfd(error);
-					if(val == 0) return;
-				}
-				else{
-					val = errorfd(error);
-					if(val == 0) return;
-					val = outputfd(output, isappend);
-					if(val == 0) return;
-				}
-			}
-			else if(outputIndex < inputIndex  && outputIndex < errorIndex){
-				int val = outputfd(output,isappend);
-				if(val == 0) return;
-				if(inputIndex<errorIndex){
-					val = inputfd(input);
-					if(val == 0) return;
-					val = errorfd(error);
-					if(val == 0) return;
-				}
-				else{
-					val = errorfd(error);
-					if(val == 0) return;
-					val = inputfd(input);
-					if(val == 0) return;
-				}
-			}
-			else
+	if(strcmp(executable,"cd") == 0)
+	{
+			int ch = chdir(arguments[0]);
+			if(ch < 0)
 			{
-				int val = errorfd(error);
-				if(val == 0) return;
-				if(inputIndex < outputIndex){
-					val = inputfd(input);
-					if(val == 0) return;
-					val = outputfd(output, isappend);
-					if(val == 0) return;
-				}
-				else{
-					val=outputfd(output,isappend);
-					if(val == 0) return;
-				  val = inputfd(input);
-					if(val == 0) return;
-				}
+				printf("Wrong path specified.Check the Path again\n");
 			}
+			return 1;
+	}
 
-			if(strcmp(executable,"") == 0) return;
+	if(strcmp(executable, "clear") == 0)
+	{
+		printf("\e[1;1H\e[2J");
+		return 1;
+	}
 
-			char *args[1000];
-			char command[1000] = "/bin/";
-			strcat(command, executable);
-			int i = 0;
-			args[i] = command;
-			++i;
-
-			if(strlen(attribute) > 0){
-					char arg1[1000] = "-";
-					strcat(arg1,attribute);
-					args[i] = arg1;
-					++i;
-			}
-
-			if(numArguments > 0){
-				for(int j=0; j<numArguments; j++) {
-					args[i] = arguments[j];
-					++i;
-				}
-			}
-
-			int check = execvp(args[0],args);
-
-			if(check < 0) {
-
-				memset(args[0],'\0', 1000*sizeof(char));
-				strcat(args[0], "/usr/bin/");
-				strcat(args[0], executable);
-
-				check = execvp(args[0],args);
-				if(check < 0) {
-					printf("%s\n", "Exec command failed.");
-				}
-			}
-			exit(1);
+	if(strcmp(executable, "history") == 0) {
+		if(ncmd == 0) {
+			printf("%s\n", "No Commands Found");
 		}
 		else {
-			while(wait(&status) != pid);
+			for(int i=0; i<ncmd; ++i) {
+				printf("%d %s\n",i+1,cmdhistory[i]);
+			}
 		}
+		return 1;
+	}
+	return 0;
+}
+
+void execute()
+{
+		if(inputind < outputind && inputind < errorind){
+			int val = inputfd(input);
+			if(val == 0) return;
+			if(outputind<errorind){
+				val = outputfd(output, isappend);
+				if(val == 0) return;
+				val = errorfd(error);
+				if(val == 0) return;
+			}
+			else{
+				val = errorfd(error);
+				if(val == 0) return;
+				val = outputfd(output, isappend);
+				if(val == 0) return;
+			}
+		}
+		else if(outputind < inputind  && outputind < errorind){
+			int val = outputfd(output,isappend);
+			if(val == 0) return;
+			if(inputind<errorind){
+				val = inputfd(input);
+				if(val == 0) return;
+				val = errorfd(error);
+				if(val == 0) return;
+			}
+			else{
+				val = errorfd(error);
+				if(val == 0) return;
+				val = inputfd(input);
+				if(val == 0) return;
+			}
+		}
+		else
+		{
+			int val = errorfd(error);
+			if(val == 0) return;
+			if(inputind < outputind){
+					val = inputfd(input);
+				if(val == 0) return;
+				val = outputfd(output, isappend);
+				if(val == 0) return;
+			}
+			else{
+				val=outputfd(output,isappend);
+				if(val == 0) return;
+			  val = inputfd(input);
+				if(val == 0) return;
+			}
+		}
+
+		if(strcmp(executable,"") == 0) exit(0);
+
+		char *args[1000];
+		char command[1000] = "/bin/";
+		strcat(command, executable);
+		int i = 0;
+		args[i] = command;
+		++i;
+		if(strlen(attribute) > 0){
+			char arg1[1000] = "-";
+			strcat(arg1,attribute);
+			args[i] = arg1;
+			++i;
+		}
+
+		if(numArguments > 0){
+			for(int j=0; j<numArguments; j++) {
+				args[i] = arguments[j];
+				++i;
+			}
+		}
+
+		int check = execvp(args[0],args);
+
+
+
+		memset(args[0],'\0', 1000*sizeof(char));
+		strcat(args[0], "/usr/bin/");
+		strcat(args[0], executable);
+
+		int check2 = execvp(args[0],args);
+
+		if(check < 0 || check2 < 0) {
+					printf("%s\n", "Exec command failed.");
+		}
+		exit(1);
+
 }
 
 /*
@@ -410,11 +396,6 @@ int findAttribute(int low, char *command, char *string)
 */
 void determineExec(char command[])
 {
-	int lengthString = strlen(command);
-	char executable[1000], attribute[1000];
-	char output[1000], error[1000], input[1000];
-	char arguments[100][1000];
-	int isappend = 0, numArguments = 0, inputind = -1, outputind = -1, errorind = -1;
 	memset(executable,'\0', 1000*sizeof(char));
 	memset(attribute,'\0', 1000*sizeof(char));
 	memset(input,'\0', 1000*sizeof(char));
@@ -423,7 +404,13 @@ void determineExec(char command[])
 	for(int i=0;i<100;++i) {
 		memset(arguments[i],'\0', 1000*sizeof(char));
 	}
+	isappend = 0;
+	numArguments = 0;
+	inputind = -1;
+	outputind = -1;
+	errorind = -1;
 
+	int lengthString = strlen(command);
 
 	for(int g=1;g<lengthString;g++)
 	{
@@ -555,16 +542,41 @@ void determineExec(char command[])
 			numArguments++;
 		}
 	}
+}
 
-	printf("output = %s\n", output);
-	printf("input = %s\n", input);
-	printf("error = %s\n", error);
-	printf("#attributes = %s\n", attribute);
-	printf("executable = %s\n", executable);
-	for(int i=0; i<numArguments; ++i) {
-		printf("arguments = %s\n", arguments[i]);
-	}
-	execute(executable,input,output,error,attribute,numArguments,arguments, isappend, inputind, outputind, errorind);
+void multiplePipe(char **cmd)
+{
+  int   p[2];
+  pid_t pid;
+  int   fd_in = 0;
+
+  while (*cmd != NULL)
+  {
+			// printf("%s\n", *cmd);
+      pipe(p);
+			int pipe_sz = fcntl(p[1], F_SETPIPE_SZ, 1000000);
+      if ((pid = fork()) == -1)
+      {
+					printf("%s\n", "Cannot fork child process!!");
+          exit(0);
+      }
+      else if (pid == 0)
+      {
+          dup2(fd_in, 0); //change the input according to the old one
+          if (*(cmd + 1) != NULL)
+            dup2(p[1], 1);
+          close(p[0]);
+          determineExec(*cmd);
+					execute();
+      }
+      else
+      {
+        close(p[1]);
+        fd_in = p[0]; //save the input for the next command
+				wait(NULL);
+        cmd++;
+      }
+  }
 }
 
 /*
@@ -573,37 +585,18 @@ void determineExec(char command[])
 void splitByPipe(char *line)
 {
 	char *array[1000];
+	for(int i=0;i<100;++i) {
+		array[i] = '\0';
+	}
 	int elements = splitByType(line, array, "|");
 
-	if(elements == 1)
-	{
-		determineExec(array[0]);
-	}
-	else {
-		int fd[elements][2];
-		for(int j=0; j<elements; ++j) {
-			pipe(fd[elements]);
-		}
+	determineExec(array[0]);
+	int check = specialCommand();
 
-		for (int j = elements - 1; j>=0 ; --j)
-		{
-			pid_t pid = fork();
-			int status;
-			if(pid == 0) {
-				if(j > 0) {
-					
-				}
-				if(j < elements - 1) {
 
-				}
-			}
-			else if(pid > 0) {
-				while(wait(&status) != pid);
-			}
-			else {
 
-			}
-		}
+	if(elements != 1 || check == 0) {
+		multiplePipe(array);
 	}
 }
 
@@ -617,10 +610,14 @@ void Input()
 	char* command=malloc(sizeof(char)*1000);
 	size_t n = 1000;
 	getline(&command, &n, stdin);
-	command[strlen(command)-1]='\0';
+
 	if(strcmp(command,"\n")==0)
 		return;
-	cmdhistory[ncmd++] = command;
+	command[strlen(command)-1]='\0';
+
+	strcpy(cmdhistory[ncmd],command);
+	ncmd++;
+
 	if(strcmp("exit", command) == 0) {
 		printf("%s","\e[1;1H\e[2J");
 		exit(0);
