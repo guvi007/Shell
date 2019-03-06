@@ -10,8 +10,8 @@
 #include<sys/stat.h>
 #include<fcntl.h>
 char cmdhistory[1000][1000];//stores the commands used
- int ncmd=0;//keeps a count of the number of commands executed
-char executable[1000], attribute[1000];
+int ncmd=0;//keeps a count of the number of commands executed
+char executable[1000], attribute[1000];//arguments to store all the required info of a command
 char output[1000], error[1000], input[1000];
 char arguments[100][1000];
 int isappend = 0, numArguments = 0, inputind = -1, outputind = -1, errorind = -1;
@@ -33,6 +33,12 @@ int splitByType(char *line, char *array[], char *type)
 	return i;
 }
 
+
+/*
+  Checks if thepath is valid or not
+  Gets the Absolute of the Path taken as Input
+  Returns the absolute Path
+*/
 char* getPath(char* string)
 {
 	char *actualPath;
@@ -64,12 +70,16 @@ char* getPath(char* string)
 		strcat(actualPath,"/");
 		strcat(actualPath, path[elements-1]);
 	}
-
-	chdir(currentPath);
+  chdir(currentPath);
 	strcat(actualPath,"\0");
 	return actualPath;
 }
 
+
+/*
+  Checks if the File exists at the argument path
+  If file does not exist the mentioned file is created
+*/
 void checkfile(int fileno,char *path)
 {
 	if( fileno == -1)
@@ -85,6 +95,10 @@ void checkfile(int fileno,char *path)
 	}
 }
 
+
+/*
+  Handles all the '<' redirection and adjusts the file descriptor accordingly
+*/
 int inputfd(char *input)
 {
 	if(strlen(input) > 0)
@@ -132,6 +146,10 @@ int inputfd(char *input)
 	return 1;
 }
 
+
+/*
+  Handles all the '>' redirection and adjusts the file descriptor accordingly
+*/
 int outputfd(char *output, int isappend)
 {
 	if(strlen(output) > 0)
@@ -184,6 +202,10 @@ int outputfd(char *output, int isappend)
 	return 1;
 }
 
+
+/*
+  Adjusts the Error File Descriptor
+*/
 int errorfd(char *error)
 {
 	if(strlen(error) > 0)
@@ -226,11 +248,23 @@ int errorfd(char *error)
 	return 1;
 }
 
+
+/*
+  Handles all the specialcommands i.e commands not in /bin,/usr/bin
+  Eg- cd ,clear,history
+*/
 int specialCommand()
 {
 	if(strcmp(executable,"cd") == 0)
 	{
-			int ch = chdir(arguments[0]);
+      int len = strlen(arguments[0]);
+
+      int ch = 0;
+      if(len == 0 || strcmp(arguments[0], "$HOME") == 0) {
+        ch = chdir(getenv("HOME"));
+      }
+      else
+        ch = chdir(arguments[0]);
 			if(ch < 0)
 			{
 				printf("Wrong path specified.Check the Path again\n");
@@ -258,6 +292,11 @@ int specialCommand()
 	return 0;
 }
 
+
+/*
+  Main Execute function which calls execvp to implement commands entered into shell
+  Uses global variables (Above) to implement based on User commands
+*/
 void execute()
 {
 		if(inputind < outputind && inputind < errorind){
@@ -349,6 +388,7 @@ void execute()
 
 }
 
+
 /*
 	Function to jump over spaces.
 	Returns the index of last space until non-space character is found.
@@ -364,6 +404,11 @@ int removeSpacing(char *string, int i, int lengthString)
 	return (j-1);
 }
 
+
+/*
+  Stores all the attributes in the string array
+  Returns the  index from which the attribute starts
+*/
 int findAttribute(int low, char *command, char *string)
 {
 	int lengthString = strlen(command);
@@ -390,6 +435,7 @@ int findAttribute(int low, char *command, char *string)
 	}
 	return i;
 }
+
 
 /*
 	Determines the command that has to be executed.
@@ -544,11 +590,15 @@ void determineExec(char command[])
 	}
 }
 
+/*
+  Handles commands executed through pipes
+  Changes Pipe size to 1MB
+*/
 void multiplePipe(char **cmd)
 {
   int   p[2];
   pid_t pid;
-  int   fd_in = 0;
+  int   fdIn = 0;
 
   while (*cmd != NULL)
   {
@@ -562,7 +612,7 @@ void multiplePipe(char **cmd)
       }
       else if (pid == 0)
       {
-          dup2(fd_in, 0); //change the input according to the old one
+          dup2(fdIn, 0); //change the input according to the old one
           if (*(cmd + 1) != NULL)
             dup2(p[1], 1);
           close(p[0]);
@@ -572,12 +622,13 @@ void multiplePipe(char **cmd)
       else
       {
         close(p[1]);
-        fd_in = p[0]; //save the input for the next command
+        fdIn = p[0]; //save the input for the next command
 				wait(NULL);
         cmd++;
       }
   }
 }
+
 
 /*
 	Splits the array with "|".
@@ -599,6 +650,7 @@ void splitByPipe(char *line)
 		multiplePipe(array);
 	}
 }
+
 
 /*
 	Function to take input from stdin
@@ -629,18 +681,19 @@ void Input()
 	splitByPipe(command);
 }
 
+
 /*
 	Function to handle ^C signal
 */
 void sig(int sigi)
 {
-	int a = 10;
-	char b = (char) a;
-	signal(SIGINT, sig);
-	printf("%c",b);
-	Input();
+  return;
 }
 
+
+/*
+  Main Function
+*/
 void main()
 {
 	signal(SIGINT, sig);
