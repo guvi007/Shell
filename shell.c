@@ -1,3 +1,11 @@
+/*
+  PROJECT - SHELL
+  GROUP ID: 24
+  GAURAV AGGARWAL   - 2017288
+  NIRAV DIWAN       - 2017072
+  APURV PATANI      - 2017028
+*/
+
 #define _GNU_SOURCE
 #include<stdio.h>
 #include<stdlib.h>
